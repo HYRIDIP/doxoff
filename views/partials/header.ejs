@@ -1,9 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Doxify</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css>
+    <title><%= title || 'Doxify' %></title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/larpbin.css">
+    <link rel="icon" type="image/x-icon" href="/Media/favicon.ico">
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <div class="nav-brand">
+                <a href="/">Doxify</a>
+            </div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/newpaste">New Pasta</a>
+                <a href="/users">Users</a>
+                <% if (user) { %>
+                    <a href="/dashboard">Dashboard</a>
+                    <a href="/profile">Profile</a>
+                    <% if (user.role === 'admin') { %>
+                        <a href="/admin">Admin</a>
+                    <% } %>
+                    <a href="/logout">Logout</a>
+                <% } else { %>
+                    <a href="/login">Login</a>
+                    <a href="/signup">Sign Up</a>
+                <% } %>
+            </div>
+            <div class="nav-online">
+                <span class="online-indicator" id="onlineUsers">
+                    <span class="online-dot"></span>
+                    Online: <span id="onlineCount">0</span>
+                </span>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Content will be inserted here -->
 <script src=" https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js">
     </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
