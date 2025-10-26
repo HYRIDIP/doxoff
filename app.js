@@ -1,147 +1,105 @@
 const express = require('express');
-const path = require('path');
-const bodyParser = require('body-parser');
 const session = require('express-session');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const passport = require('passport');
-const fileUpload = require('express-fileupload');
 const sqlite3 = require('sqlite3').verbose();
+const bcrypt = require('bcrypt');
+const path = require('path');
+const fs = require('fs');
+const fetch = require('node-fetch');
+const sharp = require('sharp');
+
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Set view engine to ejs
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+// Track online users
+const onlineUsers = new Map();
+const ONLINE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
-// Middleware
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(cookieParser());
-app.use(fileUpload());
-app.use(session({
-    secret: 'fewwwefwefewfnnfwewejfnknwefjwekfjbkwejbkef',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false } // Use 'secure: true' if using HTTPS
-}));
-const corsOptions = {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-};
-
-app.use(cors(corsOptions));
-
-// Middleware for Passport.js
-app.use(passport.initialize());
-app.use(passport.session());
-
-
-// Serialize and deserialize user
-passport.serializeUser((user, done) => {
-    done(null, user);
+// Middleware to track online users
+app.use((req, res, next) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  onlineUsers.set(ip, {
+    ip: ip,
+    lastSeen: Date.now(),
+    userAgent: req.get('User-Agent') || 'Unknown'
+  });
+  next();
 });
 
-passport.deserializeUser((user, done) => {
-    done(null, user);
+// Clean up old online users periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of onlineUsers.entries()) {
+    if (now - data.lastSeen > ONLINE_TIMEOUT) {
+      onlineUsers.delete(ip);
+    }
+  }
+}, 60000); // Clean every minute
+
+// Make online users available to all routes
+app.use((req, res, next) => {
+  res.locals.onlineUsersCount = onlineUsers.size;
+  next();
 });
 
 // Database setup
-const db = new sqlite3.Database('./database/pastebin.db', (err) => {
-    if (err) {
-        console.error(err.message);
-        process.exit(1);
-    }
-    console.log('Connected to the pastebin database.');
-    setupDatabase();
+const db = new sqlite3.Database('./database/pastebin.db');
+
+// Session configuration
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false }
+}));
+
+// Middleware
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static('public'));
+
+// Set EJS as templating engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Make user data available to all views
+app.use((req, res, next) => {
+  res.locals.user = req.session.user || null;
+  next();
 });
 
-function setupDatabase() {
-    db.serialize(() => {
-        // Create pastes table
-        db.run(`CREATE TABLE IF NOT EXISTS pastes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_name TEXT NOT NULL,
-            pinned BOOLEAN NOT NULL DEFAULT 0,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            text_color TEXT NOT NULL DEFAULT '#FFFFFF',
-            content_size INTEGER NOT NULL, 
-            created_at TEXT NOT NULL
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating table:', err.message);
-                process.exit(1);
-            }
-            console.log('Pastes table created or already exists.');
-        });
+// Import routes
+const homepageRoutes = require('./routes/homepage');
+const loginRoutes = require('./routes/login');
+const signupRoutes = require('./routes/signup');
+const dashboardRoutes = require('./routes/dashboard');
+const newpasteRoutes = require('./routes/newpaste');
+const viewpasteRoutes = require('./routes/viewpaste');
+const profileRoutes = require('./routes/profile');
+const usersRoutes = require('./routes/users');
+const searchRoutes = require('./routes/search');
+const adminRoutes = require('./routes/admin');
+const upgradesRoutes = require('./routes/upgrades');
 
-        // Create users table
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            admin BOOLEAN NOT NULL DEFAULT 0,
-            email TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating table:', err.message);
-                process.exit(1);
-            }
-            console.log('Users table created or already exists.');
-        });
+// Use routes
+app.use('/', homepageRoutes);
+app.use('/', loginRoutes);
+app.use('/', signupRoutes);
+app.use('/', dashboardRoutes);
+app.use('/', newpasteRoutes);
+app.use('/', viewpasteRoutes);
+app.use('/', profileRoutes);
+app.use('/', usersRoutes);
+app.use('/', searchRoutes);
+app.use('/', adminRoutes);
+app.use('/', upgradesRoutes);
 
-        // Create views table
-        db.run(`CREATE TABLE IF NOT EXISTS views (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            paste_id INTEGER NOT NULL,
-            ip TEXT NOT NULL,
-            user_agent TEXT NOT NULL,
-            viewed_at TEXT NOT NULL,
-            FOREIGN KEY(paste_id) REFERENCES pastes(id)
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating views table:', err.message);
-                process.exit(1);
-            }
-            console.log('Views table created or already exists.');
-        });
-
-        // Create comments table
-        db.run(`CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            paste_id INTEGER NOT NULL,
-            user_id INTEGER NOT NULL,
-            comment TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(paste_id) REFERENCES pastes(id),
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )`, (err) => {
-            if (err) {
-                console.error('Error creating table:', err.message);
-                process.exit(1);
-            }
-            console.log('Comments table created or already exists.');
-        });
-    });
-}
-
-// Routes
-app.use('/', require('./routes/homepage'));
-app.use('/newpaste', require('./routes/newpaste'));
-app.use('/users', require('./routes/users'));
-app.use('/upgrades', require('./routes/upgrades'));
-app.use('/search', require('./routes/search'));
-app.use('/dashboard', require('./routes/dashboard'));
-app.use('/paste', require('./routes/viewpaste'));
-app.use('/login', require('./routes/login'));
-app.use('/signup', require('./routes/signup'));
-app.use('/profile', require('./routes/profile'));
-app.use('/admin', require('./routes/admin'));
+// Online users API endpoint
+app.get('/api/online-users', (req, res) => {
+  const onlineCount = onlineUsers.size;
+  res.json({ count: onlineCount, users: Array.from(onlineUsers.values()) });
+});
 
 // Start server
-const PORT = process.env.PORT || 2000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
