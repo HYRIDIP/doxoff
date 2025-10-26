@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <%- include('../partials/header') %>
+        <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+</head>
+
+<body class="past">
+    <form id="pasteForm" action="/newpaste" method="POST">
+        <div class="bin-buttons">
+            <p>Please do not include quotation marks in your title.</p>
+            <input type="text" name="title" placeholder="Paste Title (leave empty for random)">
+            <!-- Styled color picker -->
+            <div class="color-picker">
+                <label for="text_color">Choose Text Color:</label>
+                <input type="color" id="text_color" name="text_color" value="#FFFFFF">
+            </div>
+            <div class="h-captcha" data-sitekey="ca809027-c3cb-42b6-9dd8-31d626eaa472"></div>
+            <input type="submit" name="submit" value="Submit Paste">
+        </div>
+        <textarea class="bin-text" name="content"
+            placeholder="READ THE TERMS OF SERVICE BEFORE CREATING A PASTE!"></textarea>
+    </form>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById("pasteForm");
+
+            form.addEventListener("submit", function (event) {
+                var captchaResponse = document.querySelector('textarea[name="h-captcha-response"]').value;
+                if (!captchaResponse) {
+                    alert("Please complete the hCaptcha challenge.");
+                    event.preventDefault();
+                }
+            });
+
+            const colorPicker = document.getElementById("text_color");
+            colorPicker.addEventListener("input", function () {
+                const hex = colorPicker.value;
+
+                // Convert HEX to RGB
+                const r = parseInt(hex.substr(1, 2), 16);
+                const g = parseInt(hex.substr(3, 2), 16);
+                const b = parseInt(hex.substr(5, 2), 16);
+
+                // Check if the color is too dark (pure black or very dark shades)
+                if ((r < 50 && g < 50 && b < 50) || hex === "#000000") {
+                    alert("Please select a lighter or more colorful color. Dark colors like black are not allowed.");
+                    colorPicker.value = "#FFFFFF"; // Reset to white
+                }
+            });
+        });
+    </script>
+    <script src="/js/log.js"></script>
+</body>
+
+</html>

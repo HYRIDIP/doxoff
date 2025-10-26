@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="/css/admin.css">
+    <%- include('../partials/header') %>
+
+        <style>
+            /* Dark Mode Styling */
+            body {
+                background-color: #121212;
+                color: #e0e0e0;
+                font-family: Arial, sans-serif;
+                margin: 0;
+                padding: 20px;
+            }
+
+            h1,
+            h2 {
+                color: #ffffff;
+            }
+
+            .search-bar {
+                width: 100%;
+                max-width: 400px;
+                padding: 10px;
+                margin-bottom: 15px;
+                border: 1px solid #333;
+                background: #222;
+                color: #fff;
+                border-radius: 5px;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                background: #1e1e1e;
+                border-radius: 8px;
+                overflow: hidden;
+                margin-bottom: 30px;
+            }
+
+            th,
+            td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid #333;
+            }
+
+            th {
+                background: #333;
+                color: #fff;
+            }
+
+            tr:hover {
+                background: #292929;
+            }
+
+            button {
+                background: #ff5252;
+                color: white;
+                border: none;
+                padding: 8px 14px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: 0.3s;
+            }
+
+            button:hover {
+                background: #ff3333;
+            }
+
+            .secondary-btn {
+                background: #444;
+            }
+
+            .secondary-btn:hover {
+                background: #666;
+            }
+
+            .database-section {
+                margin-top: 30px;
+                padding: 20px;
+                background: #1a1a1a;
+                border-radius: 8px;
+            }
+
+            .database-section input {
+                padding: 10px;
+                border: 1px solid #444;
+                background: #222;
+                color: #fff;
+                border-radius: 5px;
+                margin-right: 10px;
+            }
+        </style>
+</head>
+
+<body>
+    <h1>Admin Panel</h1>
+    <p>Welcome, <%= username %>
+    </p>
+
+    <!-- Pastes Section -->
+    <h2>Pastes</h2>
+    <input type="text" id="pasteSearch" class="search-bar" placeholder="Search pastes..." oninput="loadPastes()">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Title</th>
+                <th>Content</th>
+                <th>Created At</th>
+                <th>Pinned</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="pasteTable"></tbody>
+    </table>
+
+    <!-- Users Section -->
+    <h2>Users</h2>
+    <input type="text" id="userSearch" class="search-bar" placeholder="Search users..." oninput="loadUsers()">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="userTable"></tbody>
+    </table>
+
+    <!-- Comments Section -->
+    <h2>Comments</h2>
+    <input type="text" id="commentSearch" class="search-bar" placeholder="Search comments..." oninput="loadComments()">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>User</th>
+                <th>Comment</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="commentTable"></tbody>
+    </table>
+
+    <!-- Database Management -->
+    <div class="database-section">
+        <h2>Database Management</h2>
+        <a href="/admin/download-db" download>
+            <button class="secondary-btn">Download Database</button>
+        </a>
+
+        <form id="uploadForm">
+            <input type="file" id="databaseFile" required>
+            <button type="submit">Upload Database</button>
+        </form>
+    </div>
+
+    <br>
+    <a href="/" style="color: #ff5252;">Back to Home</a>
+
+    <script>
+        function fetchData(url, callback) {
+            fetch(url)
+                .then(res => res.json())
+                .then(data => callback(data))
+                .catch(err => console.error('Error:', err));
+        }
+
+        function loadPastes() {
+            fetchData(`/admin/pastes?search=${document.getElementById("pasteSearch").value}`, data => {
+                const table = document.getElementById("pasteTable");
+                table.innerHTML = "";
+                data.forEach(paste => {
+                    table.innerHTML += `
+                        <tr>
+                            <td>${paste.id}</td>
+                            <td>${paste.user_name}</td>
+                            <td>${paste.title}</td>
+                            <td>${paste.content.length > 10 ? paste.content.slice(0, 10) + '...' : paste.content}</td>
+                            <td>${paste.created_at}</td>
+                            <td>
+                                 <button onclick="togglePin(${paste.id}, ${paste.pinned})">
+                                ${paste.pinned ? 'Pinned' : 'Pin'}
+                                 </button>
+                            </td>
+                           <td><button onclick="deleteItem('/admin/delete', ${paste.id}, loadPastes)">Delete</button></td>
+                        </tr>`;
+                });
+            });
+        }
+
+        function loadUsers() {
+            fetchData(`/admin/users?search=${document.getElementById("userSearch").value}`, data => {
+                const table = document.getElementById("userTable");
+                table.innerHTML = "";
+                data.forEach(user => {
+                    table.innerHTML += `
+                        <tr>
+                            <td>${user.id}</td>
+                            <td>${user.username}</td>
+                            <td>${user.email}</td>
+                            <td><button onclick="deleteItem('/admin/delete-user', ${user.id}, loadUsers)">Delete</button></td>
+                        </tr>`;
+                });
+            });
+        }
+
+        function loadComments() {
+            fetchData(`/admin/comments?search=${document.getElementById("commentSearch").value}`, data => {
+                const table = document.getElementById("commentTable");
+                table.innerHTML = "";
+                data.forEach(comment => {
+                    table.innerHTML += `
+                        <tr>
+                            <td>${comment.id}</td>
+                            <td>${comment.username || 'Anonymous'}</td>
+                            <td>${paste.content.length > 10 ? paste.content.slice(0, 10) + '...' : paste.content}</td>
+                           <td><button onclick="deleteItem('/admin/delete-comment', ${comment.id}, loadComments)">Delete</button></td>
+                        </tr>`;
+                });
+            });
+        }
+
+        function deleteItem(url, id, reload) {
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `pasteId=${encodeURIComponent(id)}` // Properly encoding the ID
+            }).then(() => reload());
+        }
+
+        function togglePin(id, isPinned) {
+            fetch('/admin/toggle-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `pasteId=${id}&pinned=${isPinned ? 0 : 1}`
+            }).then(() => {
+                loadPastes();
+            });
+        }
+
+        document.getElementById("uploadForm").addEventListener("submit", e => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append("database", document.getElementById("databaseFile").files[0]);
+            fetch('/admin/upload-db', { method: 'POST', body: formData })
+                .then(() => alert('Database uploaded successfully!'));
+        });
+
+        loadPastes();
+        loadUsers();
+        loadComments();
+    </script>
+</body>
+
+</html>

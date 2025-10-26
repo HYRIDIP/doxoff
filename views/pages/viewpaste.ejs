@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <%- include('../partials/header') %>
+    <style>
+        /* Default link styling */
+        a {
+            color: white; /* Default color */
+            text-decoration: none; /* Remove underline */
+        }
+
+        /* Hover effect for links */
+        a:hover {
+            color: #2a9fd6; /* Change color on hover */
+            text-decoration: underline; /* Underline on hover */
+        }
+    </style>
+</head>
+<body class="past">
+    <a onclick="showHide()" href="#" class="sidebar-show"><i class="fa fa-arrow-right"></i></a>
+    <script>
+        function showHide() {
+            var x = document.getElementById("bin-buttons");
+            if (x.style.display === "none") {
+                x.style.display = "block";
+            } else {
+                x.style.display = "none";
+            }
+        }
+
+        // Function to make links in text clickable
+        function makeLinksClickable() {
+            var elements = document.querySelectorAll('.view-paste, .b-content'); // These are the areas you want links to be clickable
+            elements.forEach(function(element) {
+                var text = element.innerHTML;
+                var urlRegex = /https?:\/\/[^\s]+/g;
+                element.innerHTML = text.replace(urlRegex, function(url) {
+                    return `<a href="${url}" target="_blank">${url}</a>`;
+                });
+            });
+        }
+
+        // Call the function when the page loads
+        window.onload = makeLinksClickable;
+    </script>
+
+    <div class="bin-buttons" id="bin-buttons">
+        <p><b>Paste title:</b> <%= paste.title %></p>
+        <p><b>Paste made by:</b> <a href="/profile?uid=<%= paste.user_id || 0 %>"><%= paste.user_name %></a></p>
+        <p><b>Private:</b> <%= paste.private ? "Yes" : "No" %></p>
+        <p><b>Unlisted:</b> <%= paste.unlisted ? "Yes" : "No" %></p>
+        <p><b>Hits:</b> <%= paste.views %></p>
+        <p><b>Paste created:</b> <%= paste.created_at %></p>
+        <a target="_blank" href="/newpaste" class="btn">New Paste</a><br><br>
+        <a target="_blank" href="paste/viewraw?id=<%= paste.id %>" class="btn">View Raw</a><br><br>
+                
+        <% if (paste.pinned) { %>
+            <p style="color: red; font-weight: bold;">Comments are disabled because this paste is pinned by an Admin.</p>
+        <% } else { %>
+            <form action="/paste/comment" method="post">
+                <input type="hidden" name="paste_id" value="<%= paste.id %>">
+                <input type="hidden" name="user_id" value="<%= user_id %>">
+                <textarea name="comment" class="comment-text" placeholder="Enter comment"></textarea>
+                <div class="h-captcha" data-sitekey="ca809027-c3cb-42b6-9dd8-31d626eaa472"></div>
+                <input type="submit" name="submit" value="Post Comment">
+            </form>
+        
+            <div class="comment-container">
+                <div class="b-comments" id="paste-comments">
+                    <% comments.forEach(comment => { %>
+                        <div class="b-comments b-comment" style="padding-left: 10px; position: relative;" id="<%= comment.id %>">
+                            <b>
+                                <a style="color: #2a9fd6;" href="/profile?uid=<%= comment.user_id || 0 %>"><%= comment.username %></a>
+                            </b> - 
+                            <p title="<%= new Date(comment.created_at).toLocaleString() %>" style="display: inline;">
+                                <%= comment.created_at %>
+                            </p>
+                            <br>
+                            <div class="b-content"><%= comment.comment %></div>
+                            <br>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+        <% } %>        
+            <a href="/">Back</a>
+        </form>
+    </div>
+
+    <div class="">
+        <pre class="view-paste"><%= paste.content %></pre>
+    </div>
+    <script src="/js/log.js"></script>
+</body>
+</html>
